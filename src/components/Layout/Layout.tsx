@@ -1,12 +1,15 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
-import { Database, Home, Upload, BarChart } from 'lucide-react';
+import { Database, Home, Upload, BarChart, LogOut } from 'lucide-react';
+import { useApp } from '../../contexts/AppContext';
 
 interface LayoutProps {
   children: React.ReactNode;
 }
 
 const Layout: React.FC<LayoutProps> = ({ children }) => {
+  const { signOut } = useApp();
+
   return (
     <div className="min-h-screen bg-gray-50 flex">
       {/* Sidebar Navigation */}
@@ -50,6 +53,15 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
               <Database className="w-5 h-5" />
               <span>Database</span>
             </Link>
+          </li>
+          <li className="mt-auto">
+            <button
+              onClick={() => signOut()}
+              className="flex items-center space-x-3 p-3 rounded-lg hover:bg-red-50 text-red-600 hover:text-red-700 transition-colors w-full"
+            >
+              <LogOut className="w-5 h-5" />
+              <span>Sign Out</span>
+            </button>
           </li>
         </ul>
       </nav>

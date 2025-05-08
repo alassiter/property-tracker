@@ -4,15 +4,17 @@ import { Upload as UploadIcon } from 'lucide-react';
 import Papa from 'papaparse';
 import { useNavigate } from 'react-router-dom';
 import toast from 'react-hot-toast';
-import { db } from '../db/database';
+import { supabase } from '../lib/supabase';
+import { useApp } from '../contexts/AppContext';
 
 function Upload() {
   const navigate = useNavigate();
+  const { user } = useApp();
 
   const onDrop = useCallback(async (acceptedFiles: File[]) => {
     const file = acceptedFiles[0];
     
-    if (!file) return;
+    if (!file || !user) return;
 
     const reader = new FileReader();
     reader.onload = async (e) => {
@@ -36,16 +38,19 @@ function Upload() {
             return;
           }
 
-          // Store addresses in database
+          // Store addresses in Supabase
           try {
-            await db.properties.bulkAdd(
-              data.map(row => ({
-                originalAddress: row[addressColumn],
-                dateProcessed: new Date(),
-                status: 'pending',
-                processedData: null
-              }))
-            );
+            const records = data.map(row => ({
+              original_address: row[addressColumn],
+              status: 'pending',
+              user_id: user.id
+            }));
+
+            const { error } = await supabase
+              .from('property_records')
+              .insert(records);
+
+            if (error) throw error;
             
             toast.success('CSV data uploaded successfully');
             navigate('/results');
@@ -62,7 +67,7 @@ function Upload() {
     };
     
     reader.readAsText(file);
-  }, [navigate]);
+  }, [navigate, user]);
 
   const { getRootProps, getInputProps, isDragActive } = useDropzone({
     onDrop,
@@ -105,4 +110,4 @@ function Upload() {
   );
 }
 
-export default Upload
+export default Upload;

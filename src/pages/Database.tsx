@@ -1,19 +1,45 @@
-import React from 'react';
-import { useLiveQuery } from 'dexie-react-hooks';
-import { db } from '../db/database';
+import React, { useEffect, useState } from 'react';
 import { Trash2 } from 'lucide-react';
 import toast from 'react-hot-toast';
+import { supabase } from '../lib/supabase';
+import { PropertyRecord } from '../lib/supabase';
+import { useApp } from '../contexts/AppContext';
 
 function Database() {
-  const records = useLiveQuery(
-    () => db.properties.orderBy('dateProcessed').reverse().toArray()
-  );
+  const [records, setRecords] = useState<PropertyRecord[]>([]);
+  const { user } = useApp();
+
+  const fetchRecords = async () => {
+    if (!user) return;
+
+    try {
+      const { data, error } = await supabase
+        .from('property_records')
+        .select('*')
+        .order('date_processed', { ascending: false });
+
+      if (error) throw error;
+      setRecords(data || []);
+    } catch (error) {
+      toast.error('Error fetching records');
+      console.error(error);
+    }
+  };
 
   const clearDatabase = async () => {
+    if (!user) return;
+
     if (window.confirm('Are you sure you want to clear all records?')) {
       try {
-        await db.properties.clear();
+        const { error } = await supabase
+          .from('property_records')
+          .delete()
+          .eq('user_id', user.id);
+
+        if (error) throw error;
+        
         toast.success('Database cleared successfully');
+        await fetchRecords();
       } catch (error) {
         toast.error('Error clearing database');
         console.error(error);
@@ -21,9 +47,9 @@ function Database() {
     }
   };
 
-  if (!records) {
-    return <div className="text-center py-12">Loading...</div>;
-  }
+  useEffect(() => {
+    fetchRecords();
+  }, [user]);
 
   return (
     <div className="max-w-7xl mx-auto px-4 py-12">
@@ -57,7 +83,7 @@ function Database() {
             {records.map((record) => (
               <tr key={record.id} className="hover:bg-gray-50">
                 <td className="px-6 py-4 whitespace-nowrap">
-                  {record.originalAddress}
+                  {record.original_address}
                 </td>
                 <td className="px-6 py-4 whitespace-nowrap">
                   <span className={`
@@ -70,7 +96,7 @@ function Database() {
                   </span>
                 </td>
                 <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                  {new Date(record.dateProcessed).toLocaleString()}
+                  {new Date(record.date_processed).toLocaleString()}
                 </td>
               </tr>
             ))}
@@ -81,4 +107,4 @@ function Database() {
   );
 }
 
-export default Database
+export default Database;

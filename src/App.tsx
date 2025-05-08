@@ -1,6 +1,7 @@
 import React from 'react';
 import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
 import { Toaster } from 'react-hot-toast';
+import { useApp } from './contexts/AppContext';
 
 // Pages
 import Home from './pages/Home';
@@ -10,22 +11,35 @@ import Database from './pages/Database';
 
 // Components
 import Layout from './components/Layout/Layout';
+import Auth from './components/Auth/Auth';
 
 // Context
 import { AppProvider } from './contexts/AppContext';
+
+function AppContent() {
+  const { user } = useApp();
+
+  if (!user) {
+    return <Auth />;
+  }
+
+  return (
+    <Layout>
+      <Routes>
+        <Route path="/" element={<Home />} />
+        <Route path="/upload" element={<Upload />} />
+        <Route path="/results" element={<Results />} />
+        <Route path="/database" element={<Database />} />
+      </Routes>
+    </Layout>
+  );
+}
 
 function App() {
   return (
     <AppProvider>
       <Router>
-        <Layout>
-          <Routes>
-            <Route path="/" element={<Home />} />
-            <Route path="/upload" element={<Upload />} />
-            <Route path="/results" element={<Results />} />
-            <Route path="/database" element={<Database />} />
-          </Routes>
-        </Layout>
+        <AppContent />
         <Toaster 
           position="top-right"
           toastOptions={{

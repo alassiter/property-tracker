@@ -1,30 +1,49 @@
 import React, { useEffect, useState } from 'react';
-import { useLiveQuery } from 'dexie-react-hooks';
-import { db, PropertyRecord } from '../db/database';
 import { RefreshCw } from 'lucide-react';
 import toast from 'react-hot-toast';
+import { supabase } from '../lib/supabase';
+import { PropertyRecord } from '../lib/supabase';
+import { useApp } from '../contexts/AppContext';
 
 function Results() {
   const [isProcessing, setIsProcessing] = useState(false);
+  const [records, setRecords] = useState<PropertyRecord[]>([]);
+  const { user } = useApp();
   
-  const records = useLiveQuery(
-    () => db.properties.orderBy('dateProcessed').reverse().toArray()
-  );
-
-  const processPendingRecords = async () => {
-    if (isProcessing) return;
-    
-    setIsProcessing(true);
-    const pendingRecords = await db.properties
-      .where('status')
-      .equals('pending')
-      .toArray();
+  const fetchRecords = async () => {
+    if (!user) return;
 
     try {
+      const { data, error } = await supabase
+        .from('property_records')
+        .select('*')
+        .order('date_processed', { ascending: false });
+
+      if (error) throw error;
+      setRecords(data || []);
+    } catch (error) {
+      toast.error('Error fetching records');
+      console.error(error);
+    }
+  };
+
+  const processPendingRecords = async () => {
+    if (isProcessing || !user) return;
+    
+    setIsProcessing(true);
+    
+    try {
+      const { data: pendingRecords, error: fetchError } = await supabase
+        .from('property_records')
+        .select('*')
+        .eq('status', 'pending');
+
+      if (fetchError) throw fetchError;
+
       // Process records in batches to avoid rate limits
       const batchSize = 5;
-      for (let i = 0; i < pendingRecords.length; i += batchSize) {
-        const batch = pendingRecords.slice(i, i + batchSize);
+      for (let i = 0; i < (pendingRecords?.length || 0); i += batchSize) {
+        const batch = pendingRecords?.slice(i, i + batchSize) || [];
         await Promise.all(
           batch.map(async (record) => {
             try {
@@ -35,26 +54,39 @@ function Results() {
                   'Content-Type': 'application/json',
                   // Add your API key here
                 },
-                body: JSON.stringify({ address: record.originalAddress })
+                body: JSON.stringify({ address: record.original_address })
               });
 
               const data = await response.json();
               
-              await db.properties.update(record.id!, {
-                processedData: data,
-                status: 'processed'
-              });
+              const { error: updateError } = await supabase
+                .from('property_records')
+                .update({
+                  processed_data: data,
+                  status: 'processed',
+                  date_processed: new Date().toISOString()
+                })
+                .eq('id', record.id);
+
+              if (updateError) throw updateError;
             } catch (error) {
-              await db.properties.update(record.id!, {
-                status: 'error',
-                errorMessage: error instanceof Error ? error.message : 'Unknown error'
-              });
+              const { error: errorUpdateError } = await supabase
+                .from('property_records')
+                .update({
+                  status: 'error',
+                  error_message: error instanceof Error ? error.message : 'Unknown error',
+                  date_processed: new Date().toISOString()
+                })
+                .eq('id', record.id);
+
+              if (errorUpdateError) console.error(errorUpdateError);
             }
           })
         );
       }
       
       toast.success('All records processed successfully');
+      await fetchRecords();
     } catch (error) {
       toast.error('Error processing records');
       console.error(error);
@@ -64,14 +96,14 @@ function Results() {
   };
 
   useEffect(() => {
-    if (records?.some(r => r.status === 'pending')) {
+    fetchRecords();
+  }, [user]);
+
+  useEffect(() => {
+    if (records.some(r => r.status === 'pending')) {
       processPendingRecords();
     }
   }, [records]);
-
-  if (!records) {
-    return <div className="text-center py-12">Loading...</div>;
-  }
 
   return (
     <div className="max-w-7xl mx-auto px-4 py-12">
@@ -88,13 +120,13 @@ function Results() {
       </div>
 
       <div className="grid gap-6">
-        {records.map((record: PropertyRecord) => (
+        {records.map((record) => (
           <div key={record.id} className="card">
             <div className="flex justify-between items-start mb-4">
               <div>
-                <h3 className="text-lg font-semibold">{record.originalAddress}</h3>
+                <h3 className="text-lg font-semibold">{record.original_address}</h3>
                 <p className="text-sm text-gray-500">
-                  Processed: {new Date(record.dateProcessed).toLocaleString()}
+                  Processed: {new Date(record.date_processed).toLocaleString()}
                 </p>
               </div>
               <span className={`
@@ -109,12 +141,12 @@ function Results() {
             
             {record.status === 'processed' && (
               <pre className="bg-gray-50 p-4 rounded-md overflow-x-auto">
-                {JSON.stringify(record.processedData, null, 2)}
+                {JSON.stringify(record.processed_data, null, 2)}
               </pre>
             )}
             
             {record.status === 'error' && (
-              <p className="text-red-600">{record.errorMessage}</p>
+              <p className="text-red-600">{record.error_message}</p>
             )}
           </div>
         ))}
@@ -123,4 +155,4 @@ function Results() {
   );
 }
 
-export default Results
+export default Results;
