@@ -53,7 +53,7 @@ function Upload() {
             if (error) throw error;
             
             toast.success('CSV data uploaded successfully');
-            navigate('/results');
+            navigate('/database');
           } catch (error) {
             toast.error('Error storing data');
             console.error(error);
@@ -82,7 +82,7 @@ function Upload() {
       <div className="text-center mb-8">
         <h1 className="text-3xl font-bold mb-4">Upload Property Data</h1>
         <p className="text-gray-600">
-          Upload a CSV file containing property addresses to process
+          Upload a CSV file containing property addresses. The addresses will be stored for later processing.
         </p>
       </div>
 
