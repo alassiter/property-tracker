@@ -12,7 +12,7 @@ export const supabase = createClient(supabaseUrl, supabaseAnonKey);
 export type PropertyRecord = {
   id: string;
   original_address: string;
-  processed_data: any;
+  processed_data: Record<string, unknown>;
   date_processed: string;
   status: 'pending' | 'processed' | 'error';
   error_message?: string;
